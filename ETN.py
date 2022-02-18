@@ -32,7 +32,7 @@ def load_etns(file_name,gap,k,label):
         name="gap_"+str(gap)+"_k_"+str(k)+".json"
 
     with open(directory+name) as json_file:
-        S = json.load(json_file)       
+        S = json.load(json_file)
 
     return S
 
@@ -63,7 +63,7 @@ def get_node_encoding_labeled(meta,node_encoding,ego):
 
     meta_binary = list(itertools.product([0, 1], repeat=round(len(categories)**(1/2)+0.5)))
     meta_dict = dict()
-    for i in range(len(categories)):    
+    for i in range(len(categories)):
         meta_dict[categories[i]] = list(meta_binary[i])
 
 
@@ -81,8 +81,8 @@ def get_node_encoding_labeled(meta,node_encoding,ego):
     ego_encoding = meta_dict[meta[ego]]
 
     return(new_node_encoding,ego_encoding)
-        
-    
+
+
 
 
 def from_ETNS_to_ETN(s,k,meta=None):
@@ -98,7 +98,7 @@ def from_ETNS_to_ETN(s,k,meta=None):
 
         s = s[2:] # update s
         ego_encoding = s[:len(meta_binary[0])]
-        s = s[len(meta_binary[0]):] # update s 
+        s = s[len(meta_binary[0]):] # update s
 
         node_encoding = [s[i:i+len(meta_binary[0])] for i in range(0,len(s),len(meta_binary[0]))]
 
@@ -121,7 +121,7 @@ def from_ETNS_to_ETN(s,k,meta=None):
 
     ETN = nx.Graph()
     ETN.add_edges_from(egos)
-    # add ego labels 
+    # add ego labels
     if not(meta == None):
         for nod in list(ETN.nodes()):
             ETN.nodes()[nod]["label"] = meta_dict[ego_encoding]
@@ -154,8 +154,8 @@ def from_ETNS_to_ETN(s,k,meta=None):
 
     return(ETN)
 
-       
-    
+
+
 def get_ETNS(ETN,meta=None):
     nodes = list(ETN.nodes())
 
@@ -174,19 +174,19 @@ def get_ETNS(ETN,meta=None):
     node_encoding = get_node_encoding(ids_no_ego,nodes_no_ego,lenght_ETNS)
     if not(meta == None):
         node_encoding,ego_encoding = get_node_encoding_labeled(meta,node_encoding,ego)
-    
+
     for k in node_encoding.keys():
         node_encoding[k] = '0b'+''.join(str(e) for e in node_encoding[k])
 
     binary_node_encodings = list(node_encoding.values())
     binary_node_encodings.sort()
-    
+
     ETNS = '0b'+''.join(e[2:] for e in binary_node_encodings)
-    
+
     # add ego label encoding
     if not (meta == None):
         ETNS  = '0b'+''.join(str(e) for e in ego_encoding)+ETNS[2:]
-    
+
     return(ETNS)
 
 
@@ -202,7 +202,7 @@ def get_node_encoding(ids_no_ego,nodes_no_ego,lenght_ETNS):
             else:
                 enc.append(0)
         node_encoding[n]=enc
-        
+
     return(node_encoding)
 
 
@@ -212,7 +212,7 @@ def get_egocentric_neighborhood(g,v):
     return([str(v)+"*"]+list(g.neighbors(v)))
 '''
 
-quello del paper 
+quello del paper
 
 
 def build_ETN(graphs,v):
@@ -237,7 +237,7 @@ def build_ETN(graphs,v):
                 g.add_edge(en[0],en[i+1])
             en_graph.append(g)
 
-        # compose an to get disconnected ETN 
+        # compose an to get disconnected ETN
         ETN = nx.Graph()
         for g in en_graph:
             ETN = nx.compose(ETN,g)
@@ -257,7 +257,7 @@ def build_ETN(graphs,v):
                 for en in range(len(en_list_long[k+1:])):
                     add = False
                     if (n in en_list_long[k+en+1]):
-                        add = True 
+                        add = True
                         t = k + 1 + en
                         break
                 if (add == True):
@@ -273,6 +273,7 @@ def build_ETN(graphs,v):
 
 #################################### ANCHE ETN che iniziano cn ego senza negih
 def build_ETN(graphs,v):
+    '''It returns a nx.graph representing the motif with node v as ego'''
     en_list = []
     en_ids = []
     for i in graphs:
@@ -293,7 +294,7 @@ def build_ETN(graphs,v):
             g.add_edge(en[0],en[i+1])
         en_graph.append(g)
 
-    # compose an to get disconnected ETN 
+    # compose an to get disconnected ETN
     ETN = nx.Graph()
     for g in en_graph:
         ETN = nx.compose(ETN,g)
@@ -313,7 +314,7 @@ def build_ETN(graphs,v):
             for en in range(len(en_list_long[k+1:])):
                 add = False
                 if (n in en_list_long[k+en+1]):
-                    add = True 
+                    add = True
                     t = k + 1 + en
                     break
             if (add == True):
@@ -335,14 +336,14 @@ def draw_ETN(ETN,multiple=False):
                 pos[str(i)+"_"+str(t)] = [t,int(i[0])]
             else:
                 pos[str(i)+"_"+str(t)] = [t,int(i)]
-                
-    node_label = dict() 
+
+    node_label = dict()
     nodes_data = dict(ETN.nodes(data=True))
     for i in list(ETN.nodes()):
         if not(nodes_data[i] == {}):
             node_label[i] = nodes_data[i]["label"]
-            
-            
+
+
     if (node_label == {}):
         nx.draw(ETN,pos=pos,node_size=100,alpha=0.9,with_labels=True)
         nx.draw_networkx_nodes(ETN, pos, nodelist=id_ego, node_size=300, node_color='red',alpha=0.5)

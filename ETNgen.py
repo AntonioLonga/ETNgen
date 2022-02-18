@@ -7,13 +7,23 @@ def split_etns(etns,k):
     splitted_etns = []
     for i in range(0,len(etns),k):
         splitted_etns.append(etns[i:i+k])
-        
+
     return(splitted_etns)
 
 # given
 # ETNS, return
 # dict 10x _--> 101 100001001001 etc
 def get_dict(ETNS,k):
+    '''It generates the dictionary. It takes as input k and ETNS, which is a
+    dictionary (referring for instance to one hour of the day, or better to
+    local_split) with keys the signatures of the original graph and for values
+    their nb of occurrences. The dictionary that it creates puts together the
+    ETNSs that have the same key. Then it transforms frequencies into
+    probabilities.
+    New dictionary example:
+    key: 11x
+    value: [[110,111],[0.7,0.3]]
+    '''
     # new_node == 001,01,0001,00001
     new_node = "0"*k+"1"
     ETNS_list = list(ETNS.keys())
@@ -24,53 +34,56 @@ def get_dict(ETNS,k):
             splitted_etns = split_etns(etns,k+1)
             key = ""
             for etn in splitted_etns:
-                if not etn == new_node:
+                if not etn == new_node: # per il caso 001 non serve creare la key, che è semplicemente ""
                     key = key + etn[0:k]+"x"
-            if key in diz:
+            if key in diz: # append to diz the new pruned signature with its nb. of occurrences
                 diz[key][0].append("0b"+etns)
                 diz[key][1].append(ETNS["0b"+etns])
             else:
                 diz[key] = [["0b"+etns],[ETNS["0b"+etns]]]
 
     for key,value in diz.items():
-        summ = sum(diz[key][1])
+        summ = sum(diz[key][1]) # from frequences to probabilities
         c = 0
         for val in value[1]:
-            diz[key][1][c] = diz[key][1][c]/summ  
+            diz[key][1][c] = diz[key][1][c]/summ
             c = c + 1
-            
+
     return diz
 
 
-    
+
 
 # from etns to key
-# input: 101011 --> 10x01x
+# input: 101-011 --> 01x-11x
 def create_key(etns,k):
     if len(etns) == 0:
         return ""
     else:
         return "x".join(split_etns(etns,k))+"x"
 
-    
+
 
 # counts etns only for a given node
 def count_ETN_given_node(graphs,k,node):
-    S = dict()
+    '''It returns all the etns (at each timestamp) of a given node'''
     v = node
-    for i in range(len(graphs)-k + 1):
-        etn = build_ETN(graphs[i:i+k+1],v)
-        if not etn == None:
-            etns,node_encoding = get_ETNS(etn)
-            if etns in S.keys():
-                S[etns] = S[etns] + 1
-            else:
-                S[etns] = 1
+    etn = build_ETN(graphs[:k+1],v) # etn is a nx.graph representing the motif with node v as ego
+    if not etn == None:
+        etns,node_encoding = get_ETNS_with_encoding(etn) # etns is the corresponding signature and node_encoding tells the node identity
+
     return (etns[2:],node_encoding)
 
 
 # get ETNS and node generating etns
-def get_ETNS(ETN):
+def get_ETNS_with_encoding(ETN):
+    '''It translates the ETN (a nx.graph) in signature. It return the signature etns and
+    node_encoding, which tells at which node the signature is referring.
+    For instance:
+    ETNS,node_encoding = 1011 {'65': '10', '56': '11'}
+    means that node n has had an interaction 10 with node 65 and
+    an interaction 11 with node 56.
+    '''
     nodes = list(ETN.nodes())
 
     nodes_no_ego = []
@@ -89,12 +102,12 @@ def get_ETNS(ETN):
     for k in node_encoding.keys():
         node_encoding[k] = ''.join(str(e) for e in node_encoding[k])
 
-    
+
     binary_node_encodings = list(node_encoding.values())
     binary_node_encodings.sort()
-    
+
     ETNS = '0b'+''.join(e for e in binary_node_encodings)
-    
+
     return(ETNS,node_encoding)
 
 
@@ -105,7 +118,8 @@ import random
 
 # givend diz and key:
 # return a key according to the probablity.
-def get_random_etns(diz,key):
+def get_random_etns(diz,key,k):
+    '''It returns a new etns (like 101), given a key (like 10x), according to the probability stored in the dictionary.'''
     if (key in diz):
         etns = diz[key][0]
         prob = diz[key][1]
@@ -115,8 +129,8 @@ def get_random_etns(diz,key):
         for i in range(len(cumuative)-1):
             if r >= cumuative[i]  and r < cumuative[i+1]:
                 return etns[i]
-    elif (key[:-3] in diz):
-        key = key[:-3]
+    elif (key[:-(k+1)] in diz): # approximate key if the original key is not found
+        key = key[:-(k+1)]
         etns = diz[key][0]
         prob = diz[key][1]
         cumuative = [sum(prob[0:i+1]) for i in range(len(prob))]
@@ -127,13 +141,23 @@ def get_random_etns(diz,key):
                 return etns[i]
     else:
         return None
-    
-    
-    
+
+
+
+
 
 # create edge_list_g2:
 # given etns2 and etns3 merge them to create edge_list in g2
 def create_edge_g2(n,etns3,node_encoding,k):
+    '''
+    It returns the list of edges to add at the (k+1)-th layer, given node n and the
+    egocentric neighborhood etns3.
+    Example:
+    n = 36
+    etns3 = '0b100100100111'
+    node_enc = {'99': '10', '56': '10', '65': '11', '32': '10'}
+    Returns [(36, 65)]
+    '''
     new_node = k*"0"+"1"
     edges = []
     for split in split_etns(etns3[2:],k+1):
@@ -151,22 +175,23 @@ def create_edge_g2(n,etns3,node_encoding,k):
 
 # split ("x","a") and ("a","b")
 def split_stub(e):
+    '''Given a list of edges, it discerns between directed edges and stubs'''
     edges = []
     stubs = []
-    
+
     for i,j in e:
         if i == "x" or j == "x":
             stubs.append((i,j))
         else:
             edges.append((i,j))
-            
+
     return edges,stubs
 
 
 ########### originale
 '''
 def get_edges_to_keep(edges,alpha=0.5):
-    
+
     nb_edges = int(len(edges)*alpha)
     edges_to_keep = []
     # check double directions
@@ -189,37 +214,35 @@ def get_edges_to_keep(edges,alpha=0.5):
     # take only 0.5 edges
     np.random.shuffle(edges_to_keep)
     edges_to_keep = edges_to_keep[0:nb_edges]
-    
+
     return edges_to_keep
 '''
 
 ################ TEST
 def get_edges_to_keep(edges,alpha=0.5):
-    
+    '''Given the list of directed edges, it returns only the bidirectional ones
+    + a fraction alpha of the others.
+    '''
+
     edges_to_keep = []
-    # check double directions
+    #print('Initial nb of edges:', len(edges))
     for i,j in edges:
         if (j,i) in edges:
             if (i,j) not in edges_to_keep and (j,i) not in edges_to_keep:
                 edges_to_keep.append((i,j))
+                edges.remove((i,j))
+                edges.remove((j,i))
 
     nb_edges = len(edges)
-    # modifica! antonio giulia 4/ ottobre
-    nb_edges = nb_edges - (len(edges_to_keep) * 2) 
-
-    nb_edges = int(nb_edges*alpha)
-    # remove taken edges:
-    for i,j in edges_to_keep:
-        edges.remove((i,j))
-        edges.remove((j,i))
+    #print('Bidirectional edges to keep:',len(edges_to_keep))
+    #print('Nb of remaining edges:', len(edges))
+    nb_edges = int(len(edges)*alpha) # si approssima per difetto, che succede se si approssima per eccesso?
+    #print('Nb of remaining edges we want to keep:', nb_edges)
 
     np.random.shuffle(edges)
-
     edges_to_keep.extend(edges[0:nb_edges])
-    # take only 0.5 edges
-    np.random.shuffle(edges_to_keep)
-    edges_to_keep = edges_to_keep[0:nb_edges]
-    
+    #print('Total nb of edges to keep:',len(edges_to_keep))
+
     return edges_to_keep
 
 
@@ -253,7 +276,7 @@ def merge_stubs(stubs):
                     flag = False
         else:
             flag = False
-            
+
     return edges
 
 
@@ -262,7 +285,7 @@ def get_edges_g2(edges,alpha):
     edges,stubs = split_stub(edges)
     edges_g2 = get_edges_to_keep(edges,alpha)
     edges_g2.extend(merge_stubs(stubs))
-    
+
     return edges_g2
 
 
@@ -274,18 +297,19 @@ def build_graph_g2(edges,nodes):
     g2 = nx.Graph()
     g2.add_nodes_from(nodes)
     g2.add_edges_from(edges)
-    
+
     return g2
 
 
 
 # given g0,g1,diz and nodes retrung a nx graph
 def generate_graph_g2(nodes,graphs,diz,k,alpha):
+    '''It generates a new temporal layer, given the previous k, the dictionary and the nodes list'''
     edges = []
-    for n in graphs[0].nodes():
-        etns2,node_enc = count_ETN_given_node(graphs,k,n)
+    for n in graphs[0].nodes(): #build provisional layer
+        etns2,node_enc = count_ETN_given_node(graphs,k,n) # etns of the last k layers for node n
         key = create_key(etns2,k)
-        etns3 = get_random_etns(diz,key)
+        etns3 = get_random_etns(diz,key,k) #i.e. etns3 = '0b100'
         if not etns3 == None:
             edges.extend(create_edge_g2(n,etns3,node_enc,k))
 
@@ -321,13 +345,13 @@ def generate_seed_graph(graphs,graphs_seed,k,alpha):
     new_g = generate_graph_g2(nodes,graphs_seed,diz,k,alpha)
     graphs_seed.append(new_g)
     return graphs_seed
-    
-    
+
+
 # generate k graph seed given g0
 def generate_seed_graphs(g0,graphs,k,alpha):
     graphs_seed = [g0]
 
     for i in range(k-1):
         graphs_seed = generate_seed_graph(graphs,graphs_seed,i+1,alpha)
-        
+
     return graphs_seed
