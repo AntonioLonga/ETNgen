@@ -13,7 +13,7 @@ def load_data(path,sep=" "):
     np.array: a np array with the loaded data
 
     """
-    data = pd.read_csv(path,sep,names=["t","a","b"])
+    data = pd.read_csv(filepath_or_buffer=path,sep=sep,names=["t","a","b"])
     return(data)
 
 
