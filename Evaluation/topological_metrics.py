@@ -215,6 +215,7 @@ def average_shortest_path(graphs):
         sub_G = g.subgraph(largest_cc).copy()  # get subgrph
         res.append(nx.average_shortest_path_length(sub_G)) # get average shortest_path
 
+    res = [i for i in res if i > 0]
     return res
 
 
