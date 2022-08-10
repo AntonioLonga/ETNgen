@@ -13,7 +13,7 @@ def split_etns(etns,k):
 # given
 # ETNS, return
 # dict 10x _--> 101 100001001001 etc
-def get_dict(ETNS,k):
+def get_dict(ETNS,k,return_statistics=False):
     '''It generates the dictionary. It takes as input k and ETNS, which is a
     dictionary (referring for instance to one hour of the day, or better to
     local_split) with keys the signatures of the original graph and for values
@@ -41,15 +41,19 @@ def get_dict(ETNS,k):
                 diz[key][1].append(ETNS["0b"+etns])
             else:
                 diz[key] = [["0b"+etns],[ETNS["0b"+etns]]]
-
+    statistics = 0
     for key,value in diz.items():
         summ = sum(diz[key][1]) # from frequences to probabilities
+        statistics += summ
         c = 0
         for val in value[1]:
             diz[key][1][c] = diz[key][1][c]/summ
             c = c + 1
 
-    return diz
+    if return_statistics:
+        return diz,statistics
+    else:
+        return diz
 
 
 
