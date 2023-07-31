@@ -4,6 +4,54 @@ import numpy as np
 from scipy import stats
 
 
+def compute_average_ks2(metric,graphs_in,graphs_gen,weight=None):
+    if not weight == None:
+        metrics_in = metric(graphs_in,weight)
+        metrics_gen = metric(graphs_gen,weight)
+    else:
+        metrics_in = metric(graphs_in)
+        metrics_gen = metric(graphs_gen)
+
+    res = [[],[]]
+    if metrics_in == [] or metrics_gen == []:
+        s = 0
+        p = 0
+    else:
+        s,p = stats.ks_2samp(metrics_in,metrics_gen)
+    res[0].append(s)
+    res[1].append(p)
+
+    s,p = np.mean(res,-1)
+    return s,p
+
+
+def compute_all_metrics_comphy(graphs_in,graphs_gen):
+    #v_density,p_density = compute_average_ks2(closeness,graphs_in,graphs_gen)
+    #print("closeness \t %.3f %f"% (v_density,p_density))
+    #v_glo_c,p_glo_c = compute_average_ks2(betweenness,graphs_in,graphs_gen)
+    #print("betweenness\t %.3f %f"% (v_glo_c,p_glo_c)) 
+    #v_aspl,p_aspl = compute_average_ks2(betweenness,graphs_in,graphs_gen,True)
+    #print("W betweenness p\t %.3f %f"% (v_aspl,p_aspl))
+    v_p,p_p = compute_average_ks2(hour_closeness,graphs_in,graphs_gen)
+    print("hour_closeness \t %.3f %f"% (v_p,p_p))
+    v_n,p_n = compute_average_ks2(hour_betweenness,graphs_in,graphs_gen,False)
+    print("hour_betweenness \t %.3f %f"% (v_n,p_n))
+    v_ass,p_ass = compute_average_ks2(hour_betweenness,graphs_in,graphs_gen,True)
+    print("W hour_betweenness \t %.3f %f"% (v_ass,p_ass))
+    
+    v_sm,p_sm = compute_average_ks2(nb_connected_components,graphs_in,graphs_gen)
+    print("nb_connected_components\t %.3f %f"% (v_sm,p_sm))   
+    v_f,p_f = compute_average_ks2(hour_modularity,graphs_in,graphs_gen)
+    print("hour_modularity f \t %.3f %f"% (v_f,p_f))
+    v_str,p_str = compute_average_ks2(hour_clustering,graphs_in,graphs_gen)
+    print("hour_clustering \t %.3f %f"% (v_str,p_str))
+    v_dur,p_dur = compute_average_ks2(hour_assort,graphs_in,graphs_gen)
+    print("hour_assort \t %.3f %f"% (v_dur,p_dur))
+
+         
+    
+    return [(v_p,p_p),(v_n,p_n),(v_ass,p_ass),
+            (v_sm,p_sm),(v_f,p_f),(v_str,p_str),(v_dur,p_dur)]
 #compute_all_metrics
 def compute_all_metrics(graphs_in,graphs_gen):
     v_density,p_density = compute_average_ks(density,graphs_in,graphs_gen)
@@ -34,9 +82,13 @@ def compute_all_metrics(graphs_in,graphs_gen):
 
 
 
-def compute_average_ks(metric,graphs_in,graphs_gen):
-    metrics_in = metric(graphs_in)
-    metrics_gen = metric(graphs_gen)
+def compute_average_ks(metric,graphs_in,graphs_gen,weight=False):
+    if weight:
+        metrics_in = metric(graphs_in,True)
+        metrics_gen = metric(graphs_gen,True)
+    else:
+        metrics_in = metric(graphs_in)
+        metrics_gen = metric(graphs_gen)
 
     res = [[],[]]
     if metrics_in == [] or metrics_gen == []:
@@ -233,4 +285,88 @@ def s_metric(graphs):
     return res
 
 
+
+
+def closeness(graphs):
+    G_aggr = get_weighted_graph(graphs)
+    c = nx.closeness_centrality(G_aggr)
+    return c
+
+def betweenness(graphs,weighted):
+    G_aggr = get_weighted_graph(graphs)
+    if weighted:
+        b = nx.betweenness_centrality(G_aggr,weight='weight')
+    else:
+        b = nx.betweenness_centrality(G_aggr,weight=None)
+    return b
+
+
+def hour_closeness(graphs):
+    c = []
+    tot_hours_dataset = len(graphs)*300/3600
+    for hour_n in range(int(tot_hours_dataset)):
+        G_aggr = get_weighted_graph(graphs[int(3600/300)*hour_n:int(3600/300)*(hour_n+1)])
+        c_dict = nx.closeness_centrality(G_aggr)
+        if c_dict == {}:
+            c.append(0)
+        else:
+            c.append(np.mean(list(c_dict.values())))
+
+    return c
+
+
+def hour_betweenness(graphs,weighted):
+    c = []
+    tot_hours_dataset = len(graphs)*300/3600
+    for hour_n in range(int(tot_hours_dataset)):
+        G_aggr = get_weighted_graph(graphs[int(3600/300)*hour_n:int(3600/300)*(hour_n+1)])
+        if weighted:
+            c_dict = nx.betweenness_centrality(G_aggr,weight='weight')
+        else:
+            c_dict = nx.betweenness_centrality(G_aggr,weight=None)
+        if c_dict == {}:
+            c.append(0)
+        else:
+            c.append(np.mean(list(c_dict.values())))
+
+    return c
+
+def nb_connected_components(graphs):
+    nc = []
+    for g in graphs:
+        nc.append(nx.number_connected_components(g))
+    return nc
+
+
+def hour_modularity(graphs):
+    m_list = []
+    tot_hours_dataset = len(graphs)*300/3600
+
+    for hour_n in range(int(tot_hours_dataset)):
+        G_aggr = get_weighted_graph(graphs[int(3600/300)*hour_n:int(3600/300)*(hour_n+1)])
+        if list(G_aggr.nodes()) != []:
+            part = nx.community.greedy_modularity_communities(G_aggr,weight='weight')
+            m = nx.community.modularity(G_aggr, part,weight='weight')
+            m_list.append(m)
+
+    return m_list
+
+
+def hour_clustering(graphs):
+    tot_hours_dataset = len(graphs)*300/3600
+    clust = []
+    for hour_n in range(int(tot_hours_dataset)):
+        G_aggr = get_weighted_graph(graphs[int(3600/300)*hour_n:int(3600/300)*(hour_n+1)])
+        clust.append(nx.transitivity(G_aggr))
+    return clust
+
+def hour_assort(graphs):
+    tot_hours_dataset = len(graphs)*300/3600
+    ass = []
+    for hour_n in range(int(tot_hours_dataset)):
+        G_aggr = get_weighted_graph(graphs[int(3600/300)*hour_n:int(3600/300)*(hour_n+1)])
+        assort = nx.degree_assortativity_coefficient(G_aggr)
+        if not np.isnan(assort):
+            ass.append(assort)
+    return ass
 
